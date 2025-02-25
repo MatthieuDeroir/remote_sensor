@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Real-Time Sensor Data</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h1>Real-Time LoRa Data</h1>
+  
+  <div>
+    <canvas id="chartTemperature"></canvas>
+  </div>
+  <div>
+    <canvas id="chartHumidity"></canvas>
+  </div>
+  <!-- Add more canvases for luminosity, soil, etc. as needed -->
+
+  <script>
+    // Setup 2 charts: temperature and humidity as an example
+    const ctxTemp = document.getElementById('chartTemperature').getContext('2d');
+    const ctxHum  = document.getElementById('chartHumidity').getContext('2d');
+
+    const tempData = {
+      labels: [], // time or sensor_id
+      datasets: [
+        {
+          label: 'Temperature (°C)',
+          data: [],
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1,
+          fill: false
+        }
+      ]
+    };
+
+    const humData = {
+      labels: [],
+      datasets: [
+        {
+          label: 'Humidity (%)',
+          data: [],
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
+          fill: false
+        }
+      ]
+    };
+
+    const chartTemp = new Chart(ctxTemp, {
+      type: 'line',
+      data: tempData,
+      options: {
+        responsive: true,
+        scales: {
+          x: { display: true },
+          y: { display: true }
+        }
+      }
+    });
+
+    const chartHum = new Chart(ctxHum, {
+      type: 'line',
+      data: humData,
+      options: {
+        responsive: true,
+        scales: {
+          x: { display: true },
+          y: { display: true }
+        }
+      }
+    });
+
+    // Connect to the same host/port via WS
+    const ws = new WebSocket(`ws://${location.host}`);
+
+    ws.addEventListener('open', () => {
+      console.log('✅ Connected to Node.js WebSocket');
+    });
+
+    ws.addEventListener('message', (event) => {
+      const msg = JSON.parse(event.data);
+      // msg = { sensor_id, timestamp, luminosity, temperature, humidity, ... }
+
+      // For charting, let's put "timestamp" on x-axis
+      const label = `${msg.sensor_id} | ${msg.timestamp}`;
+
+      // Update Temperature chart
+      chartTemp.data.labels.push(label);
+      chartTemp.data.datasets[0].data.push(msg.temperature);
+      chartTemp.update();
+
+      // Update Humidity chart
+      chartHum.data.labels.push(label);
+      chartHum.data.datasets[0].data.push(msg.humidity);
+      chartHum.update();
+
+      // If you want more charts (luminosity, pressure, etc.),
+      // create more canvases and chart objects.
+    });
+
+    ws.addEventListener('close', () => {
+      console.log('❌ WebSocket closed');
+    });
+  </script>
+</body>
+</html>

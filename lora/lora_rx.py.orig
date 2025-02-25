@@ -1,0 +1,104 @@
+import time
+import busio
+import board
+import digitalio
+import adafruit_rfm9x
+import sqlite3
+
+# === LoRa Configuration ===
+CS = digitalio.DigitalInOut(board.CE1)    # LoRa NSS/CS Pin
+RESET = digitalio.DigitalInOut(board.D25) # LoRa Reset Pin
+spi = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
+
+# Initialize LoRa module
+rfm9x = adafruit_rfm9x.RFM9x(spi, CS, RESET, 433.0)  # Set to 433MHz (or 915MHz if applicable)
+rfm9x.tx_power = 23  # Max power output
+
+print("📡 LoRa Receiver Ready")
+
+# === SQLite Database Setup ===
+db_path = "lora_data.db"
+
+def init_db():
+    """Creates the database if it does not exist."""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sensor_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            luminosity REAL,
+            temperature REAL,
+            humidity REAL,
+            soil_temperature REAL,
+            soil_humidity REAL,
+            pressure REAL,
+            altitude REAL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_to_db(data):
+    """Inserts parsed sensor data into the SQLite database."""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO sensor_data (timestamp, luminosity, temperature, humidity, soil_temperature, soil_humidity, pressure, altitude)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', data)
+    conn.commit()
+    conn.close()
+    print("✅ Data saved to database!")
+
+# === Initialize Database ===
+init_db()
+
+# === Start LoRa Reception ===
+while True:
+    print("📡 Waiting for LoRa message...")
+    packet = rfm9x.receive()
+
+    if packet:
+        try:
+            # Decode received bytes to string
+            received_data = packet.decode("utf-8").strip()
+            print(packet)
+            print(f"📥 Received raw data: {received_data}")
+
+            # Split the CSV formatted data
+            data_parts = received_data.split(",")
+
+            # Ensure we have all 8 expected values
+            if len(data_parts) == 8:
+                timestamp = data_parts[0]
+                luminosity = float(data_parts[1])
+                temperature = float(data_parts[2])
+                humidity = float(data_parts[3])
+                soil_temperature = float(data_parts[4])
+                soil_humidity = float(data_parts[5])
+                pressure = float(data_parts[6])
+                altitude = float(data_parts[7])
+
+                # Display parsed data
+                print("\n🔍 Parsed Sensor Data:")
+                print(f"📅 Timestamp: {timestamp}")
+                print(f"🌞 Luminosity: {luminosity} lux")
+                print(f"🌡 Temperature: {temperature} °C")
+                print(f"💧 Humidity: {humidity} %")
+                print(f"🌱 Soil Temperature: {soil_temperature} °C")
+                print(f"💦 Soil Humidity: {soil_humidity} %")
+                print(f"🛰 Pressure: {pressure} hPa")
+                print(f"🏔 Altitude: {altitude} m")
+                print("-" * 40)
+
+                # Save to database
+                save_to_db((timestamp, luminosity, temperature, humidity, soil_temperature, soil_humidity, pressure, altitude))
+
+            else:
+                print("⚠️ Received incorrect number of data fields!")
+
+        except Exception as e:
+            print(f"❌ Error parsing LoRa data: {e}")
+
+    time.sleep(0.01)  # Wait before checking again
