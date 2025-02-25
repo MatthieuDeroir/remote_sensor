@@ -17,11 +17,11 @@ export const SensorDataProvider = ({ children }) => {
 
     useEffect(() => {
         // Connexion au Node WebSocket server (port 3001)
-        const ws = new WebSocket('ws://localhost:3001');
+        const ws = new WebSocket('ws://localhost:3000');
         wsRef.current = ws;
 
         ws.addEventListener('open', () => {
-            console.log('✅ Connected to WS on :3001');
+            console.log('✅ Connected to WS on :3000');
         });
 
         ws.addEventListener('message', evt => {
