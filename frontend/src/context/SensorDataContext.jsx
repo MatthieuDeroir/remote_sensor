@@ -17,7 +17,7 @@ export const SensorDataProvider = ({ children }) => {
 
     useEffect(() => {
         // Connexion au Node WebSocket server (port 3001)
-        const ws = new WebSocket('ws://localhost:3000');
+        const ws = new WebSocket('ws://172.20.10.2:3000');
         wsRef.current = ws;
 
         ws.addEventListener('open', () => {
